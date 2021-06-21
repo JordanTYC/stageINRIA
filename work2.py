@@ -223,7 +223,7 @@ def isIsolated(pos,P,gap=N_GAP):
 def partition(D,bx,c,gap=N_GAP):
     '''
         Returns the clusters for a barcode bx and their number of barcodes (list).
-    	
+        
         D -- dict containing all barcodes
         bx -- barcode (string)
         c -- chromosome (string)
@@ -233,16 +233,19 @@ def partition(D,bx,c,gap=N_GAP):
     chrom = get_chrom_bx(s[0])
     while chrom != c:
         i += 1
+        chrom = get_chrom_bx(s[i])
     beg = get_beg_bx(s[i])
     n = get_len_bx(s[i])
     P = [[beg,beg+n,1]]
-    for j in range(i,len(s)):
-        beg = get_beg_bx(s[j])
-        if beg - P[-1][1] <= gap:
-            P[-1][1] = beg + get_len_bx(s[j])
-            P[-1][2] += 1
-        else:
-            P.append([beg,beg + get_len_bx(s[j]),1])
+    for j in range(i+1,len(s)):
+        chrom = get_chrom_bx(s[j])
+        if chrom == c:
+          beg = get_beg_bx(s[j])
+          if beg - P[-1][1] <= gap:
+              P[-1][1] = beg + get_len_bx(s[j])
+              P[-1][2] += 1
+          else:
+              P.append([beg,beg + get_len_bx(s[j]),1])
     return P
     
  
