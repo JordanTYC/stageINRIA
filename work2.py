@@ -197,6 +197,16 @@ def get_len_bx(s):
     return int(s[2])
 
 
+def get_chrom_bx(s):
+    '''
+        Returns the chromosome of a linked-read.
+        
+        s -- string (chrom:pos:length)
+    '''
+    s = s.split(':')
+    return s[0]
+
+
 def isIsolated(pos,P,gap=N_GAP):
     '''
         Returns True if a barcode is isolated, else False.
@@ -210,28 +220,33 @@ def isIsolated(pos,P,gap=N_GAP):
     return True
 
 
-def partition(D,bx,gap=N_GAP):
+def partition(D,bx,c,gap=N_GAP):
     '''
         Returns the clusters for a barcode bx and their number of barcodes (list).
     	
         D -- dict containing all barcodes
         bx -- barcode (string)
+        c -- chromosome (string)
     '''
     s = D[bx].split(",")
-    beg = get_beg_bx(s[0])
-    n = get_len_bx(s[0])
+    i = 0
+    chrom = get_chrom_bx(s[0])
+    while chrom != c:
+        i += 1
+    beg = get_beg_bx(s[i])
+    n = get_len_bx(s[i])
     P = [[beg,beg+n,1]]
-    for i in range(1,len(s)):
-        beg = get_beg_bx(s[i])
+    for j in range(i,len(s)):
+        beg = get_beg_bx(s[j])
         if beg - P[-1][1] <= gap:
-            P[-1][1] = beg + get_len_bx(s[i])
+            P[-1][1] = beg + get_len_bx(s[j])
             P[-1][2] += 1
         else:
-            P.append([beg,beg + get_len_bx(s[i]),1])
+            P.append([beg,beg + get_len_bx(s[j]),1])
     return P
     
  
-def clean_P(P,n=4):
+def clean_P(P,n=3):
     '''
         Removes all the clusters that do not have at least n barcodes.
 
@@ -244,7 +259,6 @@ def clean_P(P,n=4):
     return F
 
 
-# verifier que ca rajoute pas une ligne vide
 def store_bx(bci):
     '''
         Reads a file and stores the barcodes in a dict.
@@ -256,27 +270,22 @@ def store_bx(bci):
         for line in filin:
             line = line.rstrip().split(";")
             D[line[0]] = line[1]
-            if '\n' in line[1]:
-                print("ok")
     return D
 
 
-def nb_isolated(L,bci):
+def nb_isolated(L,bci,D,c):
     '''
         Returns the number of isolated barcodes.
     
         L -- set of barcodes
-        file -- bci file containing all barcodes got by LRez
+        D -- dict resulting from store_bx()
     '''
-    with open("testforgap.txt","w") as test: # a supprimer plus tard
-        cpt = 0
-        D = store_bx(bci)
-        for (bx,pos) in L:
-            P = partition(D,bx)
-            test.write(str(P)) # a supprimer plus tard
-            P = clean_P(P)
-            if isIsolated(pos,P):
-                cpt += 1
+    cpt = 0
+    for (bx,pos) in L:
+        P = partition(D,bx,c)
+        P = clean_P(P)
+        if isIsolated(pos,P):
+            cpt += 1
     return cpt
 
 
@@ -291,6 +300,7 @@ def sortSV(vcf,bam,bci,truth,margin):
         truth -- file with real variants
         margin -- boolean
     '''
+    cpt = 1
     L = []
     row = row_bis = 0
     m = 100 if margin else 0
@@ -298,6 +308,7 @@ def sortSV(vcf,bam,bci,truth,margin):
     samfile = pysam.AlignmentFile(bam,"rb")
     workbook = xlsxwriter.Workbook('results.xlsx')
     worksheet = workbook.add_worksheet()
+    D = store_bx(bci)
     with open(vcf,"r") as filin:
         # skips file's head :
         line = filin.readline()
@@ -306,6 +317,8 @@ def sortSV(vcf,bam,bci,truth,margin):
         # for each variant :
         while line != '':
             v = Variant(line)
+            print("variant",cpt)
+            cpt += 1
             if v.get_svtype() == "BND":
                 if L ==[]:
                     L.append([v.chrom,v.pos,-1])
@@ -323,22 +336,22 @@ def sortSV(vcf,bam,bci,truth,margin):
                     # first BND variant is valid :
                     if isValid_bnd(L[0],realSV,m):
                         worksheet.write(row,0,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][1]))
-                        worksheet.write(row,1,nb_isolated(all_Bx,bci))
+                        worksheet.write(row,1,nb_isolated(all_Bx,bci,D,L[0][0]))
                         row += 1
                     # first BND variant is not valid :
                     else:
                         worksheet.write(row_bis,3,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][1]))
-                        worksheet.write(row_bis,4,nb_isolated(all_Bx,bci))
+                        worksheet.write(row_bis,4,nb_isolated(all_Bx,bci,D,L[0][0]))
                         row_bis += 1
                     # second BND variant is valid :
                     if isValid_bnd(L[1],realSV,m):
                         worksheet.write(row,0,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
-                        worksheet.write(row,1,nb_isolated(all_Bx_pair,bci))
+                        worksheet.write(row,1,nb_isolated(all_Bx_pair,bci,D,L[1][0]))
                         row += 1
                     # second BND variant is not valid :
                     else:
                         worksheet.write(row_bis,3,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
-                        worksheet.write(row_bis,4,nb_isolated(all_Bx_pair,bci))
+                        worksheet.write(row_bis,4,nb_isolated(all_Bx_pair,bci,D,L[1][0]))
                         row_bis += 1
                     L = []
                 # treatment of a non BND variant :
@@ -347,12 +360,12 @@ def sortSV(vcf,bam,bci,truth,margin):
                 # variant is valid :
                 if isValid(v,realSV,m):
                     worksheet.write(row,0,v.chrom+":"+str(v.pos)+"-"+str(end))
-                    worksheet.write(row,1,nb_isolated(all_Bx,bci))
+                    worksheet.write(row,1,nb_isolated(all_Bx,bci,D,v.chrom))
                     row += 1
                 # variant is not valid :
                 else:
                     worksheet.write(row_bis,3,v.chrom+":"+str(v.pos)+"-"+str(end))
-                    worksheet.write(row_bis,4,nb_isolated(all_Bx,bci))
+                    worksheet.write(row_bis,4,nb_isolated(all_Bx,bci,D,v.chrom))
                     row_bis += 1
             line = filin.readline()
     workbook.close()
