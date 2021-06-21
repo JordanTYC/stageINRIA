@@ -249,7 +249,7 @@ def partition(D,bx,c,gap=N_GAP):
     return P
     
  
-def clean_P(P,n=3):
+def clean_P(P,n=2):
     '''
         Removes all the clusters that do not have at least n barcodes.
 
@@ -312,6 +312,9 @@ def sortSV(vcf,bam,bci,truth,margin):
     workbook = xlsxwriter.Workbook('results.xlsx')
     worksheet = workbook.add_worksheet()
     D = store_bx(bci)
+    # Used to store current chromosomes for BND, and to output BND when changing chromosome
+    curChr1 = ""
+    curChr2 = ""
     with open(vcf,"r") as filin:
         # skips file's head :
         line = filin.readline()
@@ -322,10 +325,14 @@ def sortSV(vcf,bam,bci,truth,margin):
             v = Variant(line)
             print("variant",cpt)
             cpt += 1
-            if v.get_svtype() == "BND":
+            # We keep filling L if both chromosomes correspond to current one
+            # If not, this means we're not processing the same variant anymore, so we treat the BND we've read so far
+            if v.get_svtype() == "BND" and ((curChr1 == "" and curChr2 == "") or (curChr1 == v.chrom and curChr2 == get_chrom_bnd(v))):
                 if L ==[]:
                     L.append([v.chrom,v.pos,-1])
                     L.append([get_chrom_bnd(v),get_pos_bnd(v),-1])
+                    curChr1 = v.chrom
+                    curChr2 = get_chrom_bnd(v)
                 else:
                     if v.pos > L[0][2]:
                         L[0][2] = v.pos
@@ -338,12 +345,12 @@ def sortSV(vcf,bam,bci,truth,margin):
                     all_Bx_pair = get_all_Bx(samfile,L[1][0],L[1][1],L[1][2])
                     # first BND variant is valid :
                     if isValid_bnd(L[0],realSV,m):
-                        worksheet.write(row,0,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][1]))
+                        worksheet.write(row,0,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
                         worksheet.write(row,1,nb_isolated(all_Bx,bci,D,L[0][0]))
                         row += 1
                     # first BND variant is not valid :
                     else:
-                        worksheet.write(row_bis,3,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][1]))
+                        worksheet.write(row_bis,3,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
                         worksheet.write(row_bis,4,nb_isolated(all_Bx,bci,D,L[0][0]))
                         row_bis += 1
                     # second BND variant is valid :
@@ -357,19 +364,30 @@ def sortSV(vcf,bam,bci,truth,margin):
                         worksheet.write(row_bis,4,nb_isolated(all_Bx_pair,bci,D,L[1][0]))
                         row_bis += 1
                     L = []
+                    # Update current chromosomes and L if we read a BND, otherwise set them / leave them empty
+                    if v.get_svtype() == "BND":
+                        L.append([v.chrom,v.pos,-1])
+                        L.append([get_chrom_bnd(v),get_pos_bnd(v),-1])
+                        curChr1 = v.chrom
+                        curChr2 = get_chrom_bnd(v)
+                    else:
+                        curChr1 = ""
+                        curChr2 = ""
                 # treatment of a non BND variant :
-                end = v.get_end()
-                all_Bx = get_all_Bx(samfile,v.chrom,v.pos,end)
-                # variant is valid :
-                if isValid(v,realSV,m):
-                    worksheet.write(row,0,v.chrom+":"+str(v.pos)+"-"+str(end))
-                    worksheet.write(row,1,nb_isolated(all_Bx,bci,D,v.chrom))
-                    row += 1
-                # variant is not valid :
-                else:
-                    worksheet.write(row_bis,3,v.chrom+":"+str(v.pos)+"-"+str(end))
-                    worksheet.write(row_bis,4,nb_isolated(all_Bx,bci,D,v.chrom))
-                    row_bis += 1
+		# Only do if we didn't read a BND
+                if v.get_svtype() != "BND":
+                    end = v.get_end()
+                    all_Bx = get_all_Bx(samfile,v.chrom,v.pos,end)
+                    # variant is valid :
+                    if isValid(v,realSV,m):
+                        worksheet.write(row,0,v.chrom+":"+str(v.pos)+"-"+str(end))
+                        worksheet.write(row,1,nb_isolated(all_Bx,bci,D,v.chrom))
+                        row += 1
+                    # variant is not valid :
+                    else:
+                        worksheet.write(row_bis,3,v.chrom+":"+str(v.pos)+"-"+str(end))
+                        worksheet.write(row_bis,4,nb_isolated(all_Bx,bci,D,v.chrom))
+                        row_bis += 1
             line = filin.readline()
     workbook.close()
     samfile.close()
