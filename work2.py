@@ -11,7 +11,8 @@
 import argparse, pysam, xlsxwriter
 
 
-N_GAP = 100
+N_GAP = 1000 # space allowed between linked-reads in cluster
+L_SV = [2000,10000] # lengths for variants
 
 
 class Variant:
@@ -249,7 +250,7 @@ def partition(D,bx,c,gap=N_GAP):
     return P
     
  
-def clean_P(P,n=2):
+def clean_P(P,n=6):
     '''
         Removes all the clusters that do not have at least n barcodes.
 
@@ -304,8 +305,8 @@ def sortSV(vcf,bam,bci,truth,margin):
         margin -- boolean
     '''
     cpt = 1
+    row = 15 * [0]
     L = []
-    row = row_bis = 0
     m = 100 if margin else 0
     realSV = trueSV(truth)
     samfile = pysam.AlignmentFile(bam,"rb")
@@ -344,25 +345,37 @@ def sortSV(vcf,bam,bci,truth,margin):
                     all_Bx = get_all_Bx(samfile,L[0][0],L[0][1],L[0][2])
                     all_Bx_pair = get_all_Bx(samfile,L[1][0],L[1][1],L[1][2])
                     # first BND variant is valid :
+                    if L[0][2] - L[0][1] < L_SV[0]:
+                    		cln = 0
+                    if L_SV[0] <= L[0][2] - L[0][1] < L_SV[1]:
+                    		cln = 6
+                    if L[0][2] - L[0][1] >= L_SV[1]:
+                    		cln = 12
                     if isValid_bnd(L[0],realSV,m):
-                        worksheet.write(row,0,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
-                        worksheet.write(row,1,nb_isolated(all_Bx,bci,D,L[0][0]))
-                        row += 1
+                        worksheet.write(row[cln],cln,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
+                        worksheet.write(row[cln],cln+1,nb_isolated(all_Bx,bci,D,L[0][0]))
+                        row[cln] += 1
                     # first BND variant is not valid :
                     else:
-                        worksheet.write(row_bis,3,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
-                        worksheet.write(row_bis,4,nb_isolated(all_Bx,bci,D,L[0][0]))
-                        row_bis += 1
+                        worksheet.write(row[cln+2],cln+2,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
+                        worksheet.write(row[cln+2],cln+3,nb_isolated(all_Bx,bci,D,L[0][0]))
+                        row[cln+2] += 1
                     # second BND variant is valid :
+                    if L[1][2] - L[1][1] < L_SV[0]:
+                    		cln = 0
+                    if L_SV[0] <= L[1][2] - L[1][1] < L_SV[1]:
+                    		cln = 6
+                    if L[1][2] - L[1][1] >= L_SV[1]:
+                    		cln = 12
                     if isValid_bnd(L[1],realSV,m):
-                        worksheet.write(row,0,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
-                        worksheet.write(row,1,nb_isolated(all_Bx_pair,bci,D,L[1][0]))
-                        row += 1
+                        worksheet.write(row[cln],cln,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
+                        worksheet.write(row[cln],cln+1,nb_isolated(all_Bx_pair,bci,D,L[1][0]))
+                        row[cln] += 1
                     # second BND variant is not valid :
                     else:
-                        worksheet.write(row_bis,3,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
-                        worksheet.write(row_bis,4,nb_isolated(all_Bx_pair,bci,D,L[1][0]))
-                        row_bis += 1
+                        worksheet.write(row[cln+2],cln+2,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
+                        worksheet.write(row[cln+2],cln+3,nb_isolated(all_Bx_pair,bci,D,L[1][0]))
+                        row[cln+2] += 1
                     L = []
                     # Update current chromosomes and L if we read a BND, otherwise set them / leave them empty
                     if v.get_svtype() == "BND":
@@ -374,20 +387,26 @@ def sortSV(vcf,bam,bci,truth,margin):
                         curChr1 = ""
                         curChr2 = ""
                 # treatment of a non BND variant :
-		# Only do if we didn't read a BND
+                # Only do if we didn't read a BND
                 if v.get_svtype() != "BND":
                     end = v.get_end()
                     all_Bx = get_all_Bx(samfile,v.chrom,v.pos,end)
+                    if end - v.pos < L_SV[0]:
+                    		cln = 0
+                    if L_SV[0] <= end - v.pos < L_SV[1]:
+                    		cln = 6
+                    if end - v.pos >= L_SV[1]:
+                    		cln = 12
                     # variant is valid :
                     if isValid(v,realSV,m):
-                        worksheet.write(row,0,v.chrom+":"+str(v.pos)+"-"+str(end))
-                        worksheet.write(row,1,nb_isolated(all_Bx,bci,D,v.chrom))
-                        row += 1
+                        worksheet.write(row[cln],cln,v.chrom+":"+str(v.pos)+"-"+str(end))
+                        worksheet.write(row[cln],cln+1,nb_isolated(all_Bx,bci,D,v.chrom))
+                        row[cln] += 1
                     # variant is not valid :
                     else:
-                        worksheet.write(row_bis,3,v.chrom+":"+str(v.pos)+"-"+str(end))
-                        worksheet.write(row_bis,4,nb_isolated(all_Bx,bci,D,v.chrom))
-                        row_bis += 1
+                        worksheet.write(row[cln+2],2,v.chrom+":"+str(v.pos)+"-"+str(end))
+                        worksheet.write(row[cln+2],3,nb_isolated(all_Bx,bci,D,v.chrom))
+                        row[cln+2] += 1
             line = filin.readline()
     workbook.close()
     samfile.close()
