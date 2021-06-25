@@ -404,8 +404,8 @@ def sortSV(vcf,bam,bci,truth,margin):
                         row[cln] += 1
                     # variant is not valid :
                     else:
-                        worksheet.write(row[cln+2],2,v.chrom+":"+str(v.pos)+"-"+str(end))
-                        worksheet.write(row[cln+2],3,nb_isolated(all_Bx,bci,D,v.chrom))
+                        worksheet.write(row[cln+2],cln+2,v.chrom+":"+str(v.pos)+"-"+str(end))
+                        worksheet.write(row[cln+2],cln+3,nb_isolated(all_Bx,bci,D,v.chrom))
                         row[cln+2] += 1
             line = filin.readline()
     workbook.close()
