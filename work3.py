@@ -11,6 +11,7 @@
 import argparse, pysam, xlsxwriter
 
 GAP = 500
+L_SV = [2000,10000] # lengths for variants
 
 class Variant:
     '''
@@ -198,7 +199,7 @@ def sortSV(vcf,bam,truth,margin):
         margin -- boolean
     '''
     L = []
-    row = row_bis = 0
+    row = 15 * [0]
     m = 100 if margin else 0
     realSV = trueSV(truth)
     samfile = pysam.AlignmentFile(bam,"rb")
@@ -231,32 +232,44 @@ def sortSV(vcf,bam,truth,margin):
             else:
                 # we treat the BND variants :
                 if L != [] and L[0][2] != -1 and L[1][2] != -1:
-                    all_Bx1 = get_all_Bx(samfile,L[0][0],L[0][1]-GAP,L[0][2]+GAP)
-                    all_Bx2 = get_all_Bx(samfile,L[0][0],L[0][1]-GAP,L[0][2]+GAP)
-                    all_Bx_pair1 = get_all_Bx(samfile,L[1][0],L[1][1]-GAP,L[1][2]+GAP)
-                    all_Bx_pair2 = get_all_Bx(samfile,L[1][0],L[1][1]-GAP,L[1][2]+GAP)
+                    all_Bx1 = get_all_Bx(samfile,L[0][0],L[0][1]-GAP,L[0][1]+GAP)
+                    all_Bx2 = get_all_Bx(samfile,L[0][0],L[0][2]-GAP,L[0][2]+GAP)
+                    all_Bx_pair1 = get_all_Bx(samfile,L[1][0],L[1][1]-GAP,L[1][1]+GAP)
+                    all_Bx_pair2 = get_all_Bx(samfile,L[1][0],L[1][2]-GAP,L[1][2]+GAP)
                     nb_common1 = intersection(all_Bx1,all_Bx2)
                     nb_common2 = intersection(all_Bx_pair1,all_Bx_pair2)
                     # first BND variant is valid :
+                    if L[0][2] - L[0][1] < L_SV[0]:
+                    		cln = 0
+                    if L_SV[0] <= L[0][2] - L[0][1] < L_SV[1]:
+                    		cln = 6
+                    if L[0][2] - L[0][1] >= L_SV[1]:
+                    		cln = 12
                     if isValid_bnd(L[0],realSV,m):
-                        worksheet.write(row,0,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
-                        worksheet.write(row,1,nb_common1)
-                        row += 1
+                        worksheet.write(row[cln],cln,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
+                        worksheet.write(row[cln],cln+1,nb_common1)
+                        row[cln] += 1
                     # first BND variant is not valid :
                     else:
-                        worksheet.write(row_bis,3,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
-                        worksheet.write(row_bis,4,nb_common1)
-                        row_bis += 1
+                        worksheet.write(row[cln+2],cln+2,L[0][0]+":"+str(L[0][1])+"-"+str(L[0][2]))
+                        worksheet.write(row[cln+2],cln+3,nb_common1)
+                        row[cln+2] += 1
                     # second BND variant is valid :
+                    if L[1][2] - L[1][1] < L_SV[0]:
+                    		cln = 0
+                    if L_SV[0] <= L[1][2] - L[1][1] < L_SV[1]:
+                    		cln = 6
+                    if L[1][2] - L[1][1] >= L_SV[1]:
+                    		cln = 12
                     if isValid_bnd(L[1],realSV,m):
-                        worksheet.write(row,0,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
-                        worksheet.write(row,1,nb_common2)
-                        row += 1
+                        worksheet.write(row[cln],cln,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
+                        worksheet.write(row[cln],cln+1,nb_common2)
+                        row[cln] += 1
                     # second BND variant is not valid :
                     else:
-                        worksheet.write(row_bis,3,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
-                        worksheet.write(row_bis,4,nb_common2)
-                        row_bis += 1
+                        worksheet.write(row[cln+2],cln+2,L[1][0]+":"+str(L[1][1])+"-"+str(L[1][2]))
+                        worksheet.write(row[cln+2],cln+3,nb_common2)
+                        row[cln+2] += 1
                     L = []
                     # Update current chromosomes and L if we read a BND, otherwise set them / leave them empty
                     if v.get_svtype() == "BND":
@@ -268,22 +281,28 @@ def sortSV(vcf,bam,truth,margin):
                         curChr1 = ""
                         curChr2 = ""
                 # treatment of a non BND variant :
-		# Only do if we didn't read a BND
+                # Only do if we didn't read a BND
                 if v.get_svtype() != "BND":
                     end = v.get_end()
                     all_Bx1 = get_all_Bx(samfile,v.chrom,v.pos-GAP,v.pos+GAP)
                     all_Bx2 = get_all_Bx(samfile,v.chrom,end-GAP,end+GAP)
                     nb_common = intersection(all_Bx1,all_Bx2)
+                    if end - v.pos < L_SV[0]:
+                    		cln = 0
+                    if L_SV[0] <= end - v.pos < L_SV[1]:
+                    		cln = 6
+                    if end - v.pos >= L_SV[1]:
+                    		cln = 12
                     # variant is valid :
                     if isValid(v,realSV,m):
-                        worksheet.write(row,0,v.chrom+":"+str(v.pos)+"-"+str(end))
-                        worksheet.write(row,1,nb_common)
-                        row += 1
+                        worksheet.write(row[cln],cln,v.chrom+":"+str(v.pos)+"-"+str(end))
+                        worksheet.write(row[cln],cln+1,nb_common)
+                        row[cln] += 1
                     # variant is not valid :
                     else:
-                        worksheet.write(row_bis,3,v.chrom+":"+str(v.pos)+"-"+str(end))
-                        worksheet.write(row_bis,4,nb_common)
-                        row_bis += 1
+                        worksheet.write(row[cln+2],cln+2,v.chrom+":"+str(v.pos)+"-"+str(end))
+                        worksheet.write(row[cln+2],cln+3,nb_common)
+                        row[cln+2] += 1
             line = filin.readline()
     workbook.close()
     samfile.close()
