@@ -11,7 +11,7 @@
 import argparse, pysam, xlsxwriter
 
 
-N_GAP = 1000 # space allowed between linked-reads in cluster
+N_GAP = 5000     # space allowed between linked-reads in cluster
 L_SV = [2000,10000] # lengths for variants
 
 
@@ -165,7 +165,7 @@ def get_all_Bx(file,chrom,start,end):
     all_bx = set()
     if start > end:
         start1 = end
-        end1 = end
+        end1 = start
     else:
         start1 = start
         end1 = end
@@ -277,6 +277,13 @@ def store_bx(bci):
     return D
 
 
+def forTest(L):
+    R = []
+    for [a,b,c] in L:
+        R.append(c)
+    return R
+
+
 def nb_isolated(L,bci,D,c):
     '''
         Returns the number of isolated barcodes.
@@ -285,11 +292,14 @@ def nb_isolated(L,bci,D,c):
         D -- dict resulting from store_bx()
     '''
     cpt = 0
-    for (bx,pos) in L:
-        P = partition(D,bx,c)
-        P = clean_P(P)
-        if isIsolated(pos,P):
-            cpt += 1
+    with open("partitions.txt","a") as test:
+        for (bx,pos) in L:
+            P = partition(D,bx,c)
+            T = forTest(P)
+            test.write("\n"+str(T))
+            P = clean_P(P)
+            if isIsolated(pos,P):
+                cpt += 1
     return cpt
 
 
