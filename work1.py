@@ -131,7 +131,7 @@ def get_nb_Bx(file,chrom,start,end):
     all_bx = set()
     if start > end:
         start1 = end
-        end1 = end
+        end1 = start
     else:
         start1 = start
         end1 = end
