@@ -9,6 +9,7 @@
 
 
 import argparse, pysam, xlsxwriter
+from statistics import mean
 
 
 N_GAP = 5000     # space allowed between linked-reads in cluster
@@ -80,6 +81,7 @@ class Variant:
         if "SVLEN" in self.info:
             return int(self.info["SVLEN"])
 
+
 def trueSV(file):
     '''
         Returns a list of variants within a file.
@@ -89,9 +91,17 @@ def trueSV(file):
     '''
     truth = []
     with open(file,"r") as filin:
-        for line in filin:
+        line = filin.readline()
+        while line != '':
             sv = line.split()
-            truth.append((sv[0],int(sv[1]),int(sv[3])))
+            if sv[4] == "TRA":
+                line = filin.readline()
+                sv2 = line.split()
+                truth.append((sv[0],int(sv[1]),int(sv2[1])))
+                truth.append((sv[2],int(sv[3]),int(sv2[3])))
+            else:
+                truth.append((sv[0],int(sv[1]),int(sv[3])))
+        line = filin.readline()
     return truth
 
     
@@ -250,12 +260,18 @@ def partition(D,bx,c,gap=N_GAP):
     return P
     
  
-def clean_P(P,n=6):
+def clean_P(P):
     '''
         Removes all the clusters that do not have at least n barcodes.
 
         P -- list from partition()
     '''
+    # calculation of the mean :
+    M = []
+    for [a,b,c] in P:
+        M.append(c)
+    n = mean(M)
+    # removes short clusters :
     F = []
     for [a,b,c] in P:
         if c >= n:
