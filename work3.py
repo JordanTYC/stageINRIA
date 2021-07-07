@@ -87,12 +87,20 @@ def trueSV(file):
     '''
     truth = []
     with open(file,"r") as filin:
-        for line in filin:
+        line = filin.readline()
+        while line != '':
             sv = line.split()
-            truth.append((sv[0],int(sv[1]),int(sv[3])))
+            if sv[4] == "TRA":
+                line = filin.readline()
+                sv2 = line.split()
+                truth.append((sv[0],int(sv[1]),int(sv2[1])))
+                truth.append((sv[2],int(sv[3]),int(sv2[3])))
+            else:
+                truth.append((sv[0],int(sv[1]),int(sv[3])))
+        line = filin.readline()
     return truth
-
     
+
 def isValid(variant,L,m):
     '''
         Returns True if a Variant is valid, else False.
