@@ -5,9 +5,6 @@
     Comparison of the number of barcodes between real variants and false one.
 """
 
-########## RAJOUTER EXCEPTION POUR LES GET
-
-
 import argparse, pysam, xlsxwriter
 
 
